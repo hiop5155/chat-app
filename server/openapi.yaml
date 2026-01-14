@@ -1,0 +1,314 @@
+openapi: 3.0.0
+info:
+    title: Chat App API
+    description: Chat App Backend API Documentation (Node.js + Express + MongoDB)
+    version: 1.0.0
+servers:
+    - url: http://localhost:5001
+      description: Local Development Server
+
+components:
+    securitySchemes:
+        bearerAuth:
+            type: http
+            scheme: bearer
+            bearerFormat: JWT
+
+    schemas:
+        # --- Auth Schemas ---
+        RegisterRequest:
+            type: object
+            required:
+                - username
+                - email
+                - password
+            properties:
+                username:
+                    type: string
+                    example: cooluser123
+                email:
+                    type: string
+                    format: email
+                    example: user@example.com
+                password:
+                    type: string
+                    format: password
+                    example: password123
+
+        LoginRequest:
+            type: object
+            required:
+                - email
+                - password
+            properties:
+                email:
+                    type: string
+                    format: email
+                    example: user@example.com
+                password:
+                    type: string
+                    format: password
+                    example: password123
+
+        VerifyEmailRequest:
+            type: object
+            required:
+                - email
+                - code
+            properties:
+                email:
+                    type: string
+                    format: email
+                code:
+                    type: string
+                    description: 6-digit verification code
+                    example: '123456'
+
+        ForgotPasswordRequest:
+            type: object
+            required:
+                - email
+            properties:
+                email:
+                    type: string
+                    format: email
+
+        VerifyResetOtpRequest:
+            type: object
+            required:
+                - email
+                - otp
+            properties:
+                email:
+                    type: string
+                    format: email
+                otp:
+                    type: string
+                    description: OTP for password reset
+
+        ResetPasswordRequest:
+            type: object
+            required:
+                - email
+                - otp
+                - newPassword
+            properties:
+                email:
+                    type: string
+                    format: email
+                otp:
+                    type: string
+                newPassword:
+                    type: string
+                    example: newPassword888
+
+        # --- Chat Schemas ---
+        Message:
+            type: object
+            properties:
+                _id:
+                    type: string
+                sender:
+                    type: object
+                    properties:
+                        username:
+                            type: string
+                        email:
+                            type: string
+                content:
+                    type: string
+                type:
+                    type: string
+                    enum: ['text', 'image', 'video']
+                fileUrl:
+                    type: string
+                createdAt:
+                    type: string
+                    format: date-time
+
+        MessageRequest:
+            type: object
+            properties:
+                content:
+                    type: string
+                type:
+                    type: string
+                    enum: ['text', 'image', 'video']
+                    default: 'text'
+                fileUrl:
+                    type: string
+
+# --- API Paths ---
+paths:
+    # ===========================
+    # Authentication Endpoints
+    # ===========================
+    /api/auth/register:
+        post:
+            summary: Register new user
+            tags: [Auth]
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/RegisterRequest'
+            responses:
+                '200':
+                    description: Registration successful, verification email sent
+                '400':
+                    description: Email or Username already exists
+
+    /api/auth/verify:
+        post:
+            summary: Verify Email (Activate account)
+            tags: [Auth]
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/VerifyEmailRequest'
+            responses:
+                '200':
+                    description: Verification successful
+                '400':
+                    description: Verification code incorrect
+
+    /api/auth/login:
+        post:
+            summary: User Login
+            tags: [Auth]
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/LoginRequest'
+            responses:
+                '200':
+                    description: Login successful
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    token:
+                                        type: string
+                                    email:
+                                        type: string
+                                    username:
+                                        type: string
+                '403':
+                    description: Account not verified
+
+    /api/auth/forgot-password:
+        post:
+            summary: Forgot Password (Send OTP)
+            tags: [Auth]
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ForgotPasswordRequest'
+            responses:
+                '200':
+                    description: OTP sent to Email
+
+    /api/auth/verify-reset-otp:
+        post:
+            summary: Verify if reset password OTP is correct
+            tags: [Auth]
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/VerifyResetOtpRequest'
+            responses:
+                '200':
+                    description: Verification code correct
+                '400':
+                    description: Verification code incorrect or expired
+
+    /api/auth/reset-password:
+        post:
+            summary: Set new password
+            tags: [Auth]
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ResetPasswordRequest'
+            responses:
+                '200':
+                    description: Password reset successful
+
+    # ===========================
+    # Chat Endpoints
+    # ===========================
+    /api/chat:
+        get:
+            summary: Get all chat messages
+            tags: [Chat]
+            security:
+                - bearerAuth: []
+            responses:
+                '200':
+                    description: List of messages
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items:
+                                    $ref: '#/components/schemas/Message'
+        post:
+            summary: Send a message
+            tags: [Chat]
+            security:
+                - bearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/MessageRequest'
+            responses:
+                '200':
+                    description: Message sent successfully
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Message'
+
+    /api/chat/upload:
+        post:
+            summary: Upload media (image/video)
+            tags: [Chat]
+            security:
+                - bearerAuth: []
+            requestBody:
+                required: true
+                content:
+                    multipart/form-data:
+                        schema:
+                            type: object
+                            properties:
+                                file:
+                                    type: string
+                                    format: binary
+            responses:
+                '200':
+                    description: Upload successful
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    fileUrl:
+                                        type: string
+                                    type:
+                                        type: string
+                                        enum: ['image', 'video']
