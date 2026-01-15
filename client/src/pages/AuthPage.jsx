@@ -53,6 +53,13 @@ function AuthPage({ onLogin, isDarkMode, toggleTheme }) {
             }
 
             if (isLogin) {
+                // User Whitelist Check
+                const whitelist = ['admin@example.com', 'test@example.com'];
+                if (!whitelist.includes(data.email)) {
+                    window.location.href = 'https://google.com';
+                    return;
+                }
+
                 onLogin(data.token, data.email, data.username);
                 navigate('/');
             } else {
@@ -121,6 +128,7 @@ function AuthPage({ onLogin, isDarkMode, toggleTheme }) {
                     {error && <p className="error-msg">{error}</p>}
 
                     <div className="auth-links">
+                        {/* 
                         <p>
                             {isLogin ? '還沒帳號？' : '已有帳號？'}
                             <span onClick={toggleMode} className="toggle-link">
@@ -132,7 +140,8 @@ function AuthPage({ onLogin, isDarkMode, toggleTheme }) {
                             <p>
                                 <Link to="/forgot-password">忘記密碼？</Link>
                             </p>
-                        )}
+                        )} 
+                        */}
                     </div>
                 </div>
             </div>

@@ -66,6 +66,10 @@ router.post('/', auth, async (req, res) => {
         const savedMessage = await newMessage.save();
         const populatedMessage = await savedMessage.populate('sender', 'username email');
 
+        // Emit message to all connected clients
+        const io = req.app.get('io');
+        io.emit('message', populatedMessage);
+
         res.json(populatedMessage);
     } catch (err) {
         console.error(err);

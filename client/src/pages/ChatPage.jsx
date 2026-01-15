@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { io } from 'socket.io-client';
 import { API_URL } from '../config';
 import LoadingOverlay from '../components/LoadingOverlay';
 import { LogOut, Send, Image as ImageIcon, Video as VideoIcon, Sun, Moon } from 'lucide-react';
@@ -22,8 +23,6 @@ function ChatPage({ token, username, onLogout, isDarkMode, toggleTheme }) {
             });
             const data = await res.json();
             if (res.ok) {
-                // Check if new messages arrived to decide whether to scroll (optional optimization)
-                // For now just set data
                 setMessages(data);
             }
         } catch (err) {
@@ -33,8 +32,22 @@ function ChatPage({ token, username, onLogout, isDarkMode, toggleTheme }) {
 
     useEffect(() => {
         fetchMessages();
-        const interval = setInterval(fetchMessages, 3000); // Poll every 3 seconds
-        return () => clearInterval(interval);
+
+        // Connect to Socket.io
+        const socketUrl = API_URL.replace('/api', '');
+        const socket = io(socketUrl);
+
+        socket.on('message', (newMsg) => {
+            setMessages((prev) => {
+                // Avoid duplicates
+                if (prev.some((msg) => msg._id === newMsg._id)) return prev;
+                return [...prev, newMsg];
+            });
+        });
+
+        return () => {
+            socket.disconnect();
+        };
     }, [token]);
 
     useEffect(() => {
@@ -57,7 +70,7 @@ function ChatPage({ token, username, onLogout, isDarkMode, toggleTheme }) {
 
             if (res.ok) {
                 setNewMessage('');
-                fetchMessages();
+                // fetchMessages(); // Handled by Socket.io
             }
         } catch (err) {
             console.error(err);
@@ -98,7 +111,7 @@ function ChatPage({ token, username, onLogout, isDarkMode, toggleTheme }) {
             });
 
             if (msgRes.ok) {
-                fetchMessages();
+                // fetchMessages(); // Handled by Socket.io
             }
         } catch (err) {
             alert(err.message);
