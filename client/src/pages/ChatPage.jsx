@@ -3,7 +3,7 @@ import { io } from 'socket.io-client';
 import { API_URL } from '../config';
 import LoadingOverlay from '../components/LoadingOverlay';
 import ImageModal from '../components/ImageModal';
-import { LogOut, Send, Image as ImageIcon, Video as VideoIcon, Sun, Moon } from 'lucide-react';
+import { LogOut, Send, Image as ImageIcon, Video as VideoIcon, Sun, Moon, Bell, BellOff } from 'lucide-react';
 
 function ChatPage({ token, username, onLogout, isDarkMode, toggleTheme }) {
     const [messages, setMessages] = useState([]);
@@ -12,6 +12,7 @@ function ChatPage({ token, username, onLogout, isDarkMode, toggleTheme }) {
     const [uploading, setUploading] = useState(false);
     const [isSending, setIsSending] = useState(false);
     const [previewImage, setPreviewImage] = useState(null);
+    const [notificationPermission, setNotificationPermission] = useState('default');
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
     const textInputRef = useRef(null);
@@ -22,7 +23,26 @@ function ChatPage({ token, username, onLogout, isDarkMode, toggleTheme }) {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
+    const requestNotificationPermission = async () => {
+        if (typeof Notification === 'undefined') {
+            alert('Notifications are not supported on this device/browser.');
+            return;
+        }
+
+        try {
+            const permission = await Notification.requestPermission();
+            setNotificationPermission(permission);
+        } catch (e) {
+            console.error('Failed to request notification permission:', e);
+        }
+    };
+
     useEffect(() => {
+        // Check initial permission status safely
+        if (typeof Notification !== 'undefined') {
+            setNotificationPermission(Notification.permission);
+        }
+
         const fetchMessages = async () => {
             try {
                 const res = await fetch(`${API_URL}/chat`, {
@@ -38,11 +58,6 @@ function ChatPage({ token, username, onLogout, isDarkMode, toggleTheme }) {
         };
 
         fetchMessages();
-
-        // Request Notification Permission on mount
-        if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
-            Notification.requestPermission();
-        }
 
         // Connect to Socket.io
         const socketUrl = API_URL.replace('/api', '');
@@ -61,14 +76,18 @@ function ChatPage({ token, username, onLogout, isDarkMode, toggleTheme }) {
             // Only notify if it's not me
             if (senderName !== username) {
                 // Check if permission is granted
-                if (Notification.permission === 'granted') {
+                if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
                     // Only notify if document is hidden (user is tabbed away) OR just notify always
                     // Usually notifying when hidden is better UX, but user asked for notifications.
                     // Let's notify regardless of focus state if it's not me.
-                    new Notification(`New message from ${senderName}`, {
-                        body: newMsg.type === 'text' ? newMsg.content : `Sent a ${newMsg.type}`,
-                        icon: '/vite.svg', // Use app icon
-                    });
+                    try {
+                        new Notification(`New message from ${senderName}`, {
+                            body: newMsg.type === 'text' ? newMsg.content : `Sent a ${newMsg.type}`,
+                            icon: '/vite.svg', // Use app icon
+                        });
+                    } catch (err) {
+                        console.error('Notification error:', err);
+                    }
                 }
             }
         });
@@ -191,6 +210,15 @@ function ChatPage({ token, username, onLogout, isDarkMode, toggleTheme }) {
                 </div>
                 <div className="header-right">
                     <span className="user-greeting">Hi, {username}</span>
+                    {typeof Notification !== 'undefined' && (
+                        <button 
+                            onClick={requestNotificationPermission} 
+                            className="icon-btn" 
+                            title={notificationPermission === 'granted' ? 'Notifications Enabled' : 'Enable Notifications'}
+                        >
+                            {notificationPermission === 'granted' ? <Bell size={20} /> : <BellOff size={20} />}
+                        </button>
+                    )}
                     <button onClick={toggleTheme} className="icon-btn" title="切換主題">
                         {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
                     </button>
