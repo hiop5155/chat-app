@@ -283,6 +283,14 @@ body.dark-mode .theme-toggle-btn:hover {
     display: block;
 }
 
+.typing-indicator {
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+    color: var(--text-sub);
+    font-style: italic;
+    background-color: var(--bg-body);
+}
+
 .chat-input-area {
     background-color: var(--bg-card);
     padding: 1rem;

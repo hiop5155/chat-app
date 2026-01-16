@@ -8,31 +8,35 @@ import { LogOut, Send, Image as ImageIcon, Video as VideoIcon, Sun, Moon } from 
 function ChatPage({ token, username, onLogout, isDarkMode, toggleTheme }) {
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
+    const [typingUsers, setTypingUsers] = useState([]);
     const [uploading, setUploading] = useState(false);
+    const [isSending, setIsSending] = useState(false);
     const [previewImage, setPreviewImage] = useState(null);
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
+    const textInputRef = useRef(null);
+    const socketRef = useRef(null);
+    const typingTimeoutRef = useRef(null);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
-    const fetchMessages = async () => {
-        try {
-            const res = await fetch(`${API_URL}/chat`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            const data = await res.json();
-            if (res.ok) {
-                setMessages(data);
-            }
-        } catch (err) {
-            console.error('Error fetching messages:', err);
-        }
-    };
-
     useEffect(() => {
+        const fetchMessages = async () => {
+            try {
+                const res = await fetch(`${API_URL}/chat`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    setMessages(data);
+                }
+            } catch (err) {
+                console.error('Error fetching messages:', err);
+            }
+        };
+
         fetchMessages();
 
         // Request Notification Permission on mount
@@ -42,7 +46,8 @@ function ChatPage({ token, username, onLogout, isDarkMode, toggleTheme }) {
 
         // Connect to Socket.io
         const socketUrl = API_URL.replace('/api', '');
-        const socket = io(socketUrl);
+        socketRef.current = io(socketUrl);
+        const socket = socketRef.current;
 
         socket.on('message', (newMsg) => {
             setMessages((prev) => {
@@ -68,8 +73,22 @@ function ChatPage({ token, username, onLogout, isDarkMode, toggleTheme }) {
             }
         });
 
+        socket.on('typing', (user) => {
+            if (user !== username) {
+                setTypingUsers((prev) => {
+                    if (!prev.includes(user)) return [...prev, user];
+                    return prev;
+                });
+            }
+        });
+
+        socket.on('stop_typing', (user) => {
+            setTypingUsers((prev) => prev.filter((u) => u !== user));
+        });
+
         return () => {
             socket.disconnect();
+            socketRef.current = null;
         };
     }, [token, username]);
 
@@ -79,8 +98,9 @@ function ChatPage({ token, username, onLogout, isDarkMode, toggleTheme }) {
 
     const handleSendMessage = async (e) => {
         e.preventDefault();
-        if (!newMessage.trim()) return;
+        if (!newMessage.trim() || isSending) return;
 
+        setIsSending(true);
         try {
             const res = await fetch(`${API_URL}/chat`, {
                 method: 'POST',
@@ -93,10 +113,26 @@ function ChatPage({ token, username, onLogout, isDarkMode, toggleTheme }) {
 
             if (res.ok) {
                 setNewMessage('');
-                // fetchMessages(); // Handled by Socket.io
+                textInputRef.current?.focus();
             }
         } catch (err) {
             console.error(err);
+        } finally {
+            setIsSending(false);
+        }
+    };
+
+    const handleInputChange = (e) => {
+        setNewMessage(e.target.value);
+
+        if (socketRef.current) {
+            socketRef.current.emit('typing', username);
+
+            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+
+            typingTimeoutRef.current = setTimeout(() => {
+                if (socketRef.current) socketRef.current.emit('stop_typing', username);
+            }, 1000);
         }
     };
 
@@ -198,6 +234,12 @@ function ChatPage({ token, username, onLogout, isDarkMode, toggleTheme }) {
                     <div ref={messagesEndRef} />
                 </div>
 
+                {typingUsers.length > 0 && (
+                    <div className="typing-indicator">
+                        {typingUsers.join(', ')} {typingUsers.length > 1 ? 'are' : 'is'} typing...
+                    </div>
+                )}
+
                 <form onSubmit={handleSendMessage} className="chat-input-area">
                     <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*,video/*" style={{ display: 'none' }} />
 
@@ -205,9 +247,9 @@ function ChatPage({ token, username, onLogout, isDarkMode, toggleTheme }) {
                         <ImageIcon size={24} />
                     </button>
 
-                    <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Type a message..." />
+                    <input type="text" ref={textInputRef} value={newMessage} onChange={handleInputChange} placeholder="Type a message..." />
 
-                    <button type="submit" className="send-btn" disabled={!newMessage.trim()}>
+                    <button type="submit" className="send-btn" disabled={!newMessage.trim() || isSending} onMouseDown={(e) => e.preventDefault()}>
                         <Send size={20} />
                     </button>
                 </form>

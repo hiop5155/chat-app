@@ -32,6 +32,15 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);
     });
+
+    // Typing indicators
+    socket.on('typing', (username) => {
+        socket.broadcast.emit('typing', username);
+    });
+
+    socket.on('stop_typing', (username) => {
+        socket.broadcast.emit('stop_typing', username);
+    });
 });
 
 // DB Connection
