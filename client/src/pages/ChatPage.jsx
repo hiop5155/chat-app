@@ -3,7 +3,8 @@ import { io } from 'socket.io-client';
 import { API_URL } from '../config';
 import LoadingOverlay from '../components/LoadingOverlay';
 import ImageModal from '../components/ImageModal';
-import { LogOut, Send, Image as ImageIcon, Video as VideoIcon, Sun, Moon, Bell, BellOff } from 'lucide-react';
+import MediaGallery from '../components/MediaGallery';
+import { LogOut, Send, Image as ImageIcon, Video as VideoIcon, Sun, Moon, Bell, BellOff, Search, X, Grid } from 'lucide-react';
 
 function ChatPage({ token, username, onLogout, isDarkMode, toggleTheme }) {
     const [messages, setMessages] = useState([]);
@@ -13,9 +14,13 @@ function ChatPage({ token, username, onLogout, isDarkMode, toggleTheme }) {
     const [isSending, setIsSending] = useState(false);
     const [previewImage, setPreviewImage] = useState(null);
     const [notificationPermission, setNotificationPermission] = useState('default');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const [showMediaGallery, setShowMediaGallery] = useState(false);
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
     const textInputRef = useRef(null);
+    const searchInputRef = useRef(null);
     const socketRef = useRef(null);
     const typingTimeoutRef = useRef(null);
 
@@ -112,8 +117,16 @@ function ChatPage({ token, username, onLogout, isDarkMode, toggleTheme }) {
     }, [token, username]);
 
     useEffect(() => {
-        scrollToBottom();
-    }, [messages]);
+        if (!searchQuery) {
+            scrollToBottom();
+        }
+    }, [messages, searchQuery]);
+
+    useEffect(() => {
+        if (isSearchOpen && searchInputRef.current) {
+            searchInputRef.current.focus();
+        }
+    }, [isSearchOpen]);
 
     const handleSendMessage = async (e) => {
         e.preventDefault();
@@ -151,7 +164,7 @@ function ChatPage({ token, username, onLogout, isDarkMode, toggleTheme }) {
 
             typingTimeoutRef.current = setTimeout(() => {
                 if (socketRef.current) socketRef.current.emit('stop_typing', username);
-            }, 1000);
+            }, 5000);
         }
     };
 
@@ -203,6 +216,16 @@ function ChatPage({ token, username, onLogout, isDarkMode, toggleTheme }) {
         <div className="app-container">
             <LoadingOverlay isVisible={uploading} />
             <ImageModal src={previewImage} onClose={() => setPreviewImage(null)} />
+            {showMediaGallery && (
+                <MediaGallery 
+                    messages={messages} 
+                    onClose={() => setShowMediaGallery(false)}
+                    onImageClick={(src) => {
+                        setPreviewImage(src);
+                        // Keep gallery open in background
+                    }}
+                />
+            )}
 
             <header className="app-header">
                 <div className="header-left">
@@ -222,6 +245,37 @@ function ChatPage({ token, username, onLogout, isDarkMode, toggleTheme }) {
                     <button onClick={toggleTheme} className="icon-btn" title="切換主題">
                         {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
                     </button>
+                    
+                    {isSearchOpen ? (
+                        <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-full px-2 py-1 mr-2 transition-all">
+                            <input
+                                ref={searchInputRef}
+                                type="text"
+                                placeholder="Search..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="bg-transparent border-none outline-none text-sm px-2 w-32 md:w-48 text-gray-800 dark:text-gray-200"
+                            />
+                            <button 
+                                onClick={() => {
+                                    setSearchQuery('');
+                                    setIsSearchOpen(false);
+                                }} 
+                                className="p-1 hover:text-red-500 text-gray-500"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+                    ) : (
+                        <button onClick={() => setIsSearchOpen(true)} className="icon-btn" title="Search Messages">
+                            <Search size={20} />
+                        </button>
+                    )}
+
+                    <button onClick={() => setShowMediaGallery(true)} className="icon-btn" title="Media Gallery">
+                        <Grid size={20} />
+                    </button>
+
                     <button onClick={onLogout} className="icon-btn" title="登出">
                         <LogOut size={20} />
                     </button>
@@ -231,7 +285,11 @@ function ChatPage({ token, username, onLogout, isDarkMode, toggleTheme }) {
             <main className="chat-container">
                 <div className="messages-list">
                     {messages
-                        .filter((msg) => (msg.content && msg.content.trim()) || msg.fileUrl)
+                        .filter((msg) => {
+                            const hasContent = (msg.content && msg.content.trim()) || msg.fileUrl;
+                            if (!searchQuery) return hasContent;
+                            return hasContent && msg.content?.toLowerCase().includes(searchQuery.toLowerCase());
+                        })
                         .map((msg) => {
                             const senderName = msg.sender?.username || 'Unknown User';
                             const isMe = senderName === username;

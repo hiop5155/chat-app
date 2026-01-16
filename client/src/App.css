@@ -1,3 +1,8 @@
+/* 0. Global Reset */
+* {
+    box-sizing: border-box;
+}
+
 /* 1. Define Variables (Default Light Mode) */
 :root {
     --bg-body: #f0f2f5; /* Background color */
@@ -159,11 +164,14 @@ body.dark-mode .theme-toggle-btn:hover {
     flex-direction: column;
     height: 100vh;
     background-color: var(--bg-body);
+    overflow: hidden;
 }
 
 .app-header {
+    flex-shrink: 0;
+    height: 64px;
     background-color: var(--bg-card);
-    padding: 1rem 1.5rem;
+    padding: 0 1.5rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
