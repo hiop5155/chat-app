@@ -13,6 +13,11 @@ This Chat App allows users to communicate in real-time, sharing text messages as
 - **Database:** MongoDB (Mongoose)
 - **Authentication:** JWT (JSON Web Tokens) with email verification (Nodemailer)
 
+For detailed code structure documentation, please refer to:
+- [Client Code Structure](doc/code_struct_client.md)
+- [Server Code Structure](doc/code_struct_server.md)
+- [Project Context & Conventions](doc/GEMINI.md)
+
 ## Features
 
 - **User Authentication:**

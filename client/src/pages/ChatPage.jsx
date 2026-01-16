@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 import { API_URL } from '../config';
 import LoadingOverlay from '../components/LoadingOverlay';
+import ImageModal from '../components/ImageModal';
 import { LogOut, Send, Image as ImageIcon, Video as VideoIcon, Sun, Moon } from 'lucide-react';
 
 function ChatPage({ token, username, onLogout, isDarkMode, toggleTheme }) {
@@ -9,6 +10,7 @@ function ChatPage({ token, username, onLogout, isDarkMode, toggleTheme }) {
     const [newMessage, setNewMessage] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
+    const [previewImage, setPreviewImage] = useState(null);
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
 
@@ -33,6 +35,11 @@ function ChatPage({ token, username, onLogout, isDarkMode, toggleTheme }) {
     useEffect(() => {
         fetchMessages();
 
+        // Request Notification Permission on mount
+        if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+            Notification.requestPermission();
+        }
+
         // Connect to Socket.io
         const socketUrl = API_URL.replace('/api', '');
         const socket = io(socketUrl);
@@ -43,12 +50,28 @@ function ChatPage({ token, username, onLogout, isDarkMode, toggleTheme }) {
                 if (prev.some((msg) => msg._id === newMsg._id)) return prev;
                 return [...prev, newMsg];
             });
+
+            // Browser Notification
+            const senderName = newMsg.sender?.username || 'Unknown';
+            // Only notify if it's not me
+            if (senderName !== username) {
+                // Check if permission is granted
+                if (Notification.permission === 'granted') {
+                    // Only notify if document is hidden (user is tabbed away) OR just notify always
+                    // Usually notifying when hidden is better UX, but user asked for notifications.
+                    // Let's notify regardless of focus state if it's not me.
+                    new Notification(`New message from ${senderName}`, {
+                        body: newMsg.type === 'text' ? newMsg.content : `Sent a ${newMsg.type}`,
+                        icon: '/vite.svg', // Use app icon
+                    });
+                }
+            }
         });
 
         return () => {
             socket.disconnect();
         };
-    }, [token]);
+    }, [token, username]);
 
     useEffect(() => {
         scrollToBottom();
@@ -124,6 +147,7 @@ function ChatPage({ token, username, onLogout, isDarkMode, toggleTheme }) {
     return (
         <div className="app-container">
             <LoadingOverlay isVisible={uploading} />
+            <ImageModal src={previewImage} onClose={() => setPreviewImage(null)} />
 
             <header className="app-header">
                 <div className="header-left">
@@ -154,7 +178,12 @@ function ChatPage({ token, username, onLogout, isDarkMode, toggleTheme }) {
 
                                         {msg.type === 'text' && <p>{msg.content}</p>}
                                         {msg.type === 'image' && (
-                                            <img src={`${API_URL.replace('/api', '')}${msg.fileUrl}`} alt="Sent image" className="message-media" />
+                                            <img 
+                                                src={`${API_URL.replace('/api', '')}${msg.fileUrl}`} 
+                                                alt="Sent image" 
+                                                className="message-media cursor-pointer hover:opacity-90 transition-opacity"
+                                                onClick={() => setPreviewImage(`${API_URL.replace('/api', '')}${msg.fileUrl}`)}
+                                            />
                                         )}
                                         {msg.type === 'video' && (
                                             <video src={`${API_URL.replace('/api', '')}${msg.fileUrl}`} controls className="message-media" />

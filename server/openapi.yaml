@@ -64,6 +64,15 @@ components:
                     description: 6-digit verification code
                     example: '123456'
 
+        ResendVerificationRequest:
+            type: object
+            required:
+                - email
+            properties:
+                email:
+                    type: string
+                    format: email
+
         ForgotPasswordRequest:
             type: object
             required:
@@ -174,6 +183,22 @@ paths:
                     description: Verification successful
                 '400':
                     description: Verification code incorrect
+
+    /api/auth/resend-verification:
+        post:
+            summary: Resend verification code
+            tags: [Auth]
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ResendVerificationRequest'
+            responses:
+                '200':
+                    description: Verification code resent
+                '404':
+                    description: User not found
 
     /api/auth/login:
         post:
